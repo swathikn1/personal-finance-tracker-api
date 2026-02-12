@@ -1,13 +1,15 @@
-import express from 'express'
-import type { Request, Response } from 'express';
+import express from "express";
+import { AppDataSource } from "./utils/database";
 
-const app = express();
-const port = 3000;
+const app=express();
 
-app.get('/', (req: Request, res: Response) => {
-  res.send('TypeScript With Express!');
-});
-
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+AppDataSource.initialize()
+  .then(()=> {
+    console.log("Database connected");
+    app.listen(3000,() => {
+      console.log("Server running on port 3000");
+    });
+  })
+  .catch((error)=> {
+    console.error("Database connection failed", error);
+  });
