@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";
-import { Entries } from "../entity/entries";
+import { Entries } from "../entity/Entries";
 
 dotenv.config();
 
