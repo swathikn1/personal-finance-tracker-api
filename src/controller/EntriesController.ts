@@ -48,5 +48,41 @@ export class EntriesController{
         }
     }
 
-    
+    static async updateEntries(req:Request,res:Response){
+       try{
+        const id=Number(req.params.id);
+        const {amount,type,category,description,date}=req.body;
+        const entriesRepository=AppDataSource.getRepository(Entries)
+        const entries=(await entriesRepository.findOne({
+            where:{id},
+        }))!;
+        
+          entries.id=id;
+          entries.amount=amount;
+          entries.type=type;
+          entries.category=category;
+          entries.description=description;
+          entries.date=date;
+          await entriesRepository.save(entries)
+          return res.status(201).json({message:"Upadated Entries Successfully"})
+    }catch(error){
+             return res.status(500).json({message:"Failed to update Entries"})
+        }
+    }
+
+    static async deleteEntries(req:Request,res:Response){
+        try{
+        const id=Number(req.params.id);
+        const entriesRepository=AppDataSource.getRepository(Entries);
+        const entries=(await entriesRepository.findOne({
+            where:{id},
+        }))!;
+        await entriesRepository.remove(entries);
+        return res.status(200).json({message:"Entries Deleted Successfully"})
+    }catch(error){
+         return res.status(500).json({message:"Failed to delete entries"})
+    }
+}
+
+
 }
