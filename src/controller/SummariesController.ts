@@ -1,0 +1,22 @@
+import { AppDataSource } from "../utils/database";
+import { Entries, EntryType } from "../entity/Entries";
+import type {Request,Response} from 'express'
+
+export class SummariesController{
+    static async getSummary(req:Request,res:Response){
+        try{
+        const entriesRepository=AppDataSource.getRepository(Entries);
+         const totalIncome = (await entriesRepository.sum("amount",
+             {type: EntryType.INCOME,}))||0;
+
+        const totalExpense=(await entriesRepository.sum("amount",
+        {type:EntryType.EXPENSE,}))||0;
+
+         const balance = totalIncome - totalExpense;
+
+         return res.status(200).json({Total_Income:totalIncome,Total_Expense:totalExpense,Balance:balance})
+    }catch(error){
+        return res.status(500).json({message:"Failed to fetch summary"})
+    }
+}
+}

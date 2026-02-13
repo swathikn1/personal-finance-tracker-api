@@ -1,10 +1,12 @@
 import express from "express";
 import { AppDataSource } from "./utils/database";
 import EntriesRoute from "./routes/EntriesRoute"
+import SummariesRoute from './routes/SummariesRoute'
 
 const app=express();
 app.use(express.json());
 app.use('/api/v1/entries',EntriesRoute)
+app.use('/api/v1/summary',SummariesRoute)
 
 AppDataSource.initialize()
   .then(()=> {
