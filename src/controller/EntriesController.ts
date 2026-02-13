@@ -23,17 +23,32 @@ export class EntriesController{
         }
     }
 
-    static async getEntries(_req:Request,res:Response){
-        try{
-            const entriesRepository=AppDataSource.getRepository(Entries)
-
-            const entries=await entriesRepository.find()
-
-            return res.status(200).json({message:"All entries",entries})
-        }catch(error){
-            return res.status(500).json({message:"Failed to fetch all entries"})
+   static async getEntries(req: Request, res: Response) {
+    try {
+        const { type, category, startDate, endDate } = req.query;
+        const entriesRepository = AppDataSource.getRepository(Entries);
+        const query = entriesRepository.createQueryBuilder("entry");
+        
+        if(type) {
+            query.andWhere("entry.type=:type", { type });
         }
+        
+        if(category) {
+            query.andWhere("entry.category=:category", { category });
+        }
+        
+        if (startDate && endDate) {
+            query.andWhere("entry.date BETWEEN :startDate AND :endDate", {
+                startDate: new Date(startDate as string),
+                endDate: new Date(endDate as string),
+      });
     }
+    const entries = await query.getMany();
+    return res.status(200).json({message: "entries",entries});
+}catch(error) {
+    return res.status(500).json({message: "Failed to fetch entries",});
+  }
+}
 
     static async getEntriesById(req:Request,res:Response){
         try{

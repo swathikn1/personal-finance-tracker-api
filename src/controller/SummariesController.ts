@@ -3,7 +3,7 @@ import { Entries, EntryType } from "../entity/Entries";
 import type {Request,Response} from 'express'
 
 export class SummariesController{
-    static async getSummary(req:Request,res:Response){
+    static async getSummary(_req:Request,res:Response){
         try{
         const entriesRepository=AppDataSource.getRepository(Entries);
          const totalIncome = (await entriesRepository.sum("amount",
