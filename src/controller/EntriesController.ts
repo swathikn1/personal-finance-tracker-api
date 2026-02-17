@@ -1,6 +1,7 @@
 import type { Request,Response } from "express";
 import { Entries } from "../entity/Entries";
 import { AppDataSource } from "../utils/database";
+import { redisClient } from "../config/redis";
 
 export class EntriesController{
     static async createEntries(req:Request,res:Response){
@@ -14,9 +15,13 @@ export class EntriesController{
             entries.category=category;
             entries.description=description;
             entries.date=date;
+            
+            await redisClient.del("entries");
+            await redisClient.del("summary");
 
             const entriesRepository=AppDataSource.getRepository(Entries)
             const savedEntries=await entriesRepository.save(entries)
+
             return res.status(201).json({message:"created entries successfully",entries:savedEntries})
         }catch(error){
             return res.status(500).json({message:"Failed to create entries"})
@@ -26,6 +31,17 @@ export class EntriesController{
    static async getEntries(req: Request, res: Response) {
     try {
         const { type, category, startDate, endDate } = req.query;
+        const cacheKey=`entries:${JSON.stringify(req.query)}`;
+
+        const cached= await redisClient.get(cacheKey)
+
+        if(cached){
+            console.log('cache hit')
+            return res.status(200).json({message:"Entries(from cache)", entries:JSON.parse(cached)})
+        }
+
+        console.log('cache miss')
+
         const entriesRepository = AppDataSource.getRepository(Entries);
         const query = entriesRepository.createQueryBuilder("entry");
         
@@ -44,6 +60,10 @@ export class EntriesController{
       });
     }
     const entries = await query.getMany();
+    await redisClient.set(cacheKey, JSON.stringify(entries), {
+        EX: 60,
+    });
+
     return res.status(200).json({message: "entries",entries});
 }catch(error) {
     return res.status(500).json({message: "Failed to fetch entries",});
@@ -79,6 +99,10 @@ export class EntriesController{
           entries.description=description;
           entries.date=date;
           await entriesRepository.save(entries)
+
+        await redisClient.del("entries");
+        await redisClient.del("summary");
+
           return res.status(201).json({message:"Upadated Entries Successfully"})
     }catch(error){
              return res.status(500).json({message:"Failed to update Entries"})
@@ -93,6 +117,10 @@ export class EntriesController{
             where:{id},
         }))!;
         await entriesRepository.remove(entries);
+
+        await redisClient.del("entries");
+        await redisClient.del("summary");
+        
         return res.status(200).json({message:"Entries Deleted Successfully"})
     }catch(error){
          return res.status(500).json({message:"Failed to delete entries"})
