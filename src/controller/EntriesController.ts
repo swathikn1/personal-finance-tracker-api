@@ -2,10 +2,12 @@ import type { Request,Response } from "express";
 import { Entries } from "../entity/Entries";
 import { AppDataSource } from "../utils/database";
 import { redisClient } from "../config/redis";
+import logger from "../utils/logger";
 
 export class EntriesController{
     static async createEntries(req:Request,res:Response){
         try{
+
             const{id,amount,type,category,description,date}=req.body
 
             const entries=new Entries()
@@ -21,9 +23,12 @@ export class EntriesController{
             const entriesRepository=AppDataSource.getRepository(Entries)
             const savedEntries=await entriesRepository.save(entries)
 
-            return res.status(201).json({message:"created entries successfully",entries:savedEntries})
+            logger.info("Entry created successfully")
+
+            return res.status(201).json({message:"created entry successfully",entries:savedEntries})
         }catch(error){
-            return res.status(500).json({message:"Failed to create entries"})
+            logger.error("Failed to create entry",{error});
+            return res.status(500).json({message:"Failed to create entry"})
         }
     }
 
@@ -35,11 +40,11 @@ export class EntriesController{
         const cached= await redisClient.get(cacheKey)
 
         if(cached){
-            console.log('cache hit')
+            logger.info("Cache hit for entries",{cacheKey});
             return res.status(200).json({message:"Entries(from cache)", entries:JSON.parse(cached)})
         }
 
-        console.log('cache miss')
+        logger.error('Cache miss for entries',{cacheKey})
 
         const entriesRepository = AppDataSource.getRepository(Entries);
         const query = entriesRepository.createQueryBuilder("entry");
@@ -63,8 +68,11 @@ export class EntriesController{
         EX: 20,
     });
 
+    logger.info("Fetched data sucessfully")
+
     return res.status(200).json({message: "entries",entries});
 }catch(error) {
+    logger.error("Failed to fetch entry",{error});
     return res.status(500).json({message: "Failed to fetch entries",});
   }
 }
@@ -88,8 +96,12 @@ export class EntriesController{
             const entries= await entriesRepository.findOne({
                 where:{id}
             })
+
+            logger.info("Fetched data sucessfully")
+
             return res.status(200).json({message:"Entries successfully fetched",entries})
         }catch(error){
+            logger.error("Failed to fetch entry",{error});
             return res.status(500).json({message:"Failed to fetch entries"})
         }
     }
@@ -115,11 +127,14 @@ export class EntriesController{
         await redisClient.del(`entry:${id}`);  
         await redisClient.del("entries");
 
+        logger.info("Entry updated successfully",{id});
+
           return res.status(201).json({message:"Upadated Entries Successfully"})
     }catch(error){
-             return res.status(500).json({message:"Failed to update Entries"})
-        }
+        logger.error("Failed to update entry",{error});
+        return res.status(500).json({message:"Failed to update Entries"})
     }
+}
 
     static async deleteEntries(req:Request,res:Response){
         try{
@@ -134,6 +149,7 @@ export class EntriesController{
 
         return res.status(200).json({message:"Entries Deleted Successfully"})
     }catch(error){
+        logger.error("Failed to delete entry",{error});
          return res.status(500).json({message:"Failed to delete entries"})
     }
 }

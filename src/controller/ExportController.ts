@@ -2,6 +2,7 @@ import type { Request,Response } from "express";
 import { AppDataSource} from "../utils/database";
 import { Entries } from "../entity/Entries";
 import { Parser } from 'json2csv';
+import logger from "../utils/logger";
 
 export class ExportController{
     static async exportEntriesToCSV(req:Request,res:Response){
@@ -15,8 +16,10 @@ export class ExportController{
 
             res.header("Content-Type", "text/csv");
             res.attachment("entries.csv");
+            logger.info("Exported to CSV Successfully")
             return res.send(csv);
         } catch(error) {
+            logger.error("Failed to export entry",{error});
             return res.status(500).json({ message:"Error exporting data"});
   }
 };

@@ -4,6 +4,7 @@ import EntriesRoute from "./routes/EntriesRoute"
 import SummariesRoute from './routes/SummariesRoute'
 import ExportRoute from './routes/ExportRoute'
 import {connectRedis} from './config/redis'
+import logger from "../src/utils/logger";
 
 const app=express();
 app.use(express.json());
@@ -21,6 +22,7 @@ const startServer=async()=>{
       console.log("Server running on port 3000");
     });
 }catch(error){
+    logger.error("Failed to create entry",{error});
     console.error("Database connection failed", error);
 }
 }
