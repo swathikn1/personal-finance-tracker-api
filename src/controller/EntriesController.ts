@@ -17,7 +17,6 @@ export class EntriesController{
             entries.date=date;
             
             await redisClient.del("entries");
-            await redisClient.del("summary");
 
             const entriesRepository=AppDataSource.getRepository(Entries)
             const savedEntries=await entriesRepository.save(entries)
@@ -61,7 +60,7 @@ export class EntriesController{
     }
     const entries = await query.getMany();
     await redisClient.set(cacheKey, JSON.stringify(entries), {
-        EX: 60,
+        EX: 20,
     });
 
     return res.status(200).json({message: "entries",entries});
@@ -73,6 +72,18 @@ export class EntriesController{
     static async getEntriesById(req:Request,res:Response){
         try{
             const id=Number(req.params.id);
+            const cacheKey=`entry:${id}`
+
+            const cached=await redisClient.get(cacheKey)
+
+            if(cached){
+                console.log('Cache Hit')
+                res.status(200).json({message:'Entry (from cache)',cached})
+            }
+
+            console.log('Cache Miss')
+            // debug, info, warn, error
+
             const entriesRepository=AppDataSource.getRepository(Entries)
             const entries= await entriesRepository.findOne({
                 where:{id}
@@ -87,6 +98,7 @@ export class EntriesController{
        try{
         const id=Number(req.params.id);
         const {amount,type,category,description,date}=req.body;
+
         const entriesRepository=AppDataSource.getRepository(Entries)
         const entries=(await entriesRepository.findOne({
             where:{id},
@@ -100,8 +112,8 @@ export class EntriesController{
           entries.date=date;
           await entriesRepository.save(entries)
 
+        await redisClient.del(`entry:${id}`);  
         await redisClient.del("entries");
-        await redisClient.del("summary");
 
           return res.status(201).json({message:"Upadated Entries Successfully"})
     }catch(error){
@@ -119,8 +131,7 @@ export class EntriesController{
         await entriesRepository.remove(entries);
 
         await redisClient.del("entries");
-        await redisClient.del("summary");
-        
+
         return res.status(200).json({message:"Entries Deleted Successfully"})
     }catch(error){
          return res.status(500).json({message:"Failed to delete entries"})
