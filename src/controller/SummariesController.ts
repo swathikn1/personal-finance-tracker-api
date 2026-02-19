@@ -7,15 +7,20 @@ export class SummariesController{
     static async getSummary(_req:Request,res:Response){
         try{
         const entriesRepository=AppDataSource.getRepository(Entries);
+        const userId=(_req as any).user.userId;
          const totalIncome = (await entriesRepository.sum("amount",
-             {type: EntryType.INCOME,}))||0;
+             {type: EntryType.INCOME,
+                userId:userId,
+             }))||0;
 
         const totalExpense=(await entriesRepository.sum("amount",
-        {type:EntryType.EXPENSE,}))||0;
+            {type:EntryType.EXPENSE,
+                userId:userId
+            }))||0;
+            
+        const balance = totalIncome - totalExpense;
 
-         const balance = totalIncome - totalExpense;
-
-         logger.info("Feched summary successfully")
+         logger.info("Feched summary successfully",{userId});
          return res.status(200).json({Total_Income:totalIncome,Total_Expense:totalExpense,Balance:balance})
     }catch(error){
         logger.error("Failed to fetch summary",{error});
