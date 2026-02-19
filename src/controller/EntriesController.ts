@@ -1,158 +1,166 @@
-import type { Request,Response } from "express";
+import type { Request, Response } from "express";
 import { Entries } from "../entity/Entries";
 import { AppDataSource } from "../utils/database";
 import { redisClient } from "../config/redis";
 import logger from "../utils/logger";
 
-export class EntriesController{
-    static async createEntries(req:Request,res:Response){
-        try{
+export class EntriesController {
 
-            const{id,amount,type,category,description,date}=req.body
-
-            const entries=new Entries()
-            entries.id=id;
-            entries.amount=amount;
-            entries.type=type;
-            entries.category=category;
-            entries.description=description;
-            entries.date=date;
-            
-            await redisClient.del("entries");
-
-            const entriesRepository=AppDataSource.getRepository(Entries)
-            const savedEntries=await entriesRepository.save(entries)
-
-            logger.info("Entry created successfully")
-
-            return res.status(201).json({message:"created entry successfully",entries:savedEntries})
-        }catch(error){
-            logger.error("Failed to create entry",{error});
-            return res.status(500).json({message:"Failed to create entry"})
-        }
-    }
-
-   static async getEntries(req: Request, res: Response) {
+  
+  static async createEntries(req:Request, res:Response) {
     try {
-        const { type, category, startDate, endDate } = req.query;
-        const cacheKey=`entries:${JSON.stringify(req.query)}`;
+      const {amount,type,category,description,date}=req.body;
+      const userId=(req as any).user.userId;
 
-        const cached= await redisClient.get(cacheKey)
+      const entriesRepository=AppDataSource.getRepository(Entries);
+      const entry=new Entries();
+      entry.amount=amount;
+      entry.type=type;
+      entry.category=category;
+      entry.description=description;
+      entry.date=date;
+      entry.userId=userId; 
 
-        if(cached){
-            logger.info("Cache hit for entries",{cacheKey});
-            return res.status(200).json({message:"Entries(from cache)", entries:JSON.parse(cached)})
-        }
+      await entriesRepository.save(entry);
 
-        logger.error('Cache miss for entries',{cacheKey})
+      await redisClient.del(`entries:${userId}:*`);
 
-        const entriesRepository = AppDataSource.getRepository(Entries);
-        const query = entriesRepository.createQueryBuilder("entry");
-        
-        if(type) {
-            query.andWhere("entry.type=:type", { type });
-        }
-        
-        if(category) {
-            query.andWhere("entry.category=:category", { category });
-        }
-        
-        if (startDate && endDate) {
-            query.andWhere("entry.date BETWEEN :startDate AND :endDate", {
-                startDate: new Date(startDate as string),
-                endDate: new Date(endDate as string),
-      });
+      logger.info("Entry created successfully",{userId});
+      return res.status(201).json({message: "Entry created successfully", entry });
+    } catch (error) {
+      logger.error("Failed to create entry",{error});
+      return res.status(500).json({message: "Failed to create entry" });
     }
-    const entries = await query.getMany();
-    await redisClient.set(cacheKey, JSON.stringify(entries), {
-        EX: 20,
+  }
+
+
+  static async getEntries(req:Request, res:Response) {
+    try {
+      const userId=(req as any).user.userId;
+      const {type,category,startDate,endDate}=req.query;
+
+      const cacheKey=`entries:${userId}:${JSON.stringify(req.query)}`;
+      const cached=await redisClient.get(cacheKey);
+
+      if (cached) {
+        logger.info("Cache hit for entries",{cacheKey});
+        return res.status(200).json({message:"Entries (from cache)", entries: JSON.parse(cached) });
+      }
+
+      logger.info("Cache miss for entries",{cacheKey});
+      const entriesRepository=AppDataSource.getRepository(Entries);
+      const query=entriesRepository.createQueryBuilder("entries")
+        .where("entries.userId=:userId",{userId});
+
+      if (type) 
+        query.andWhere("entries.type = :type",{type});
+      if (category) 
+        query.andWhere("entries.category = :category", {category});
+      if (startDate && endDate) {
+        query.andWhere("entries.date BETWEEN :startDate AND :endDate", {
+          startDate: startDate as string,
+          endDate: endDate as string,
+        });
+      }
+
+      const entries = await query.getMany();
+
+      await redisClient.set(cacheKey, JSON.stringify(entries), { EX: 20 });
+
+      logger.info("Fetched entries successfully", {userId});
+      return res.status(200).json({message: "Entries fetched", entries });
+    } catch (error) {
+      logger.error("Failed to fetch entries", {error});
+      return res.status(500).json({message: "Failed to fetch entries" });
+    }
+  }
+
+  
+  static async getEntryById(req:Request,res:Response) {
+    try {
+      const userId=(req as any).user.userId;
+      const id=Number(req.params.id);
+
+      const cacheKey=`entry:${userId}:${id}`;
+      const cached=await redisClient.get(cacheKey);
+      if (cached) {
+        logger.info("Cache hit for entry", {cacheKey});
+        return res.status(200).json({ message: "Entry (from cache)", entry: JSON.parse(cached) });
+      }
+
+      const entriesRepository=AppDataSource.getRepository(Entries);
+      const entry=await entriesRepository.findOne({ 
+        where: { id,userId } 
     });
 
-    logger.info("Fetched data sucessfully")
+      if (!entry)
+        return res.status(404).json({message: "Entry not found" });
 
-    return res.status(200).json({message: "entries",entries});
-}catch(error) {
-    logger.error("Failed to fetch entry",{error});
-    return res.status(500).json({message: "Failed to fetch entries",});
+      await redisClient.set(cacheKey,JSON.stringify(entry),{ EX: 20 });
+      logger.info("Fetched entry successfully",{userId,id });
+
+      return res.status(200).json({message: "Entry fetched successfully", entry });
+    } catch (error) {
+      logger.error("Failed to fetch entry",{error});
+      return res.status(500).json({message: "Failed to fetch entry" });
+    }
   }
-}
 
-    static async getEntriesById(req:Request,res:Response){
-        try{
-            const id=Number(req.params.id);
-            const cacheKey=`entry:${id}`
+  static async updateEntry(req:Request,res:Response) {
+    try {
+      const userId=(req as any).user.userId;
+      const id=Number(req.params.id);
+      const {amount,type,category,description,date}=req.body;
 
-            const cached=await redisClient.get(cacheKey)
+      const entriesRepository=AppDataSource.getRepository(Entries);
+      const entry=await entriesRepository.findOne({ 
+        where:{id,userId} 
+    });
 
-            if(cached){
-                console.log('Cache Hit')
-                res.status(200).json({message:'Entry (from cache)',cached})
-            }
+      if (!entry) 
+        return res.status(404).json({message: "Entry not found"});
 
-            console.log('Cache Miss')
-            // debug, info, warn, error
+      entry.amount=amount;
+      entry.type=type;
+      entry.category=category;
+      entry.description=description;
+      entry.date=date;
 
-            const entriesRepository=AppDataSource.getRepository(Entries)
-            const entries= await entriesRepository.findOne({
-                where:{id}
-            })
+      await entriesRepository.save(entry);
 
-            logger.info("Fetched data sucessfully")
+      await redisClient.del(`entry:${userId}:${id}`);
+      await redisClient.del(`entries:${userId}:*`);
 
-            return res.status(200).json({message:"Entries successfully fetched",entries})
-        }catch(error){
-            logger.error("Failed to fetch entry",{error});
-            return res.status(500).json({message:"Failed to fetch entries"})
-        }
+      logger.info("Entry updated successfully",{userId,id});
+      return res.status(200).json({message:"Entry updated successfully",entry });
+    } catch (error) {
+      logger.error("Failed to update entry",{error});
+      return res.status(500).json({message:"Failed to update entry" });
     }
+  }
 
-    static async updateEntries(req:Request,res:Response){
-       try{
-        const id=Number(req.params.id);
-        const {amount,type,category,description,date}=req.body;
+  static async deleteEntry(req:Request,res:Response) {
+    try {
+      const userId=(req as any).user.userId;
+      const id=Number(req.params.id);
 
-        const entriesRepository=AppDataSource.getRepository(Entries)
-        const entries=(await entriesRepository.findOne({
-            where:{id},
-        }))!;
-        
-          entries.id=id;
-          entries.amount=amount;
-          entries.type=type;
-          entries.category=category;
-          entries.description=description;
-          entries.date=date;
-          await entriesRepository.save(entries)
+      const entriesRepository=AppDataSource.getRepository(Entries);
+      const entry=await entriesRepository.findOne({ 
+        where: {id,userId} 
+    });
 
-        await redisClient.del(`entry:${id}`);  
-        await redisClient.del("entries");
+      if (!entry)
+        return res.status(404).json({message: "Entry not found" });
 
-        logger.info("Entry updated successfully",{id});
+      await entriesRepository.remove(entry);
+      await redisClient.del(`entry:${userId}:${id}`);
+      await redisClient.del(`entries:${userId}:*`);
 
-          return res.status(201).json({message:"Upadated Entries Successfully"})
-    }catch(error){
-        logger.error("Failed to update entry",{error});
-        return res.status(500).json({message:"Failed to update Entries"})
+      logger.info("Entry deleted successfully",{userId,id});
+      return res.status(200).json({message: "Entry deleted successfully"});
+    } catch(error) {
+      logger.error("Failed to delete entry",{error});
+      return res.status(500).json({message: "Failed to delete entry"});
     }
-}
-
-    static async deleteEntries(req:Request,res:Response){
-        try{
-        const id=Number(req.params.id);
-        const entriesRepository=AppDataSource.getRepository(Entries);
-        const entries=(await entriesRepository.findOne({
-            where:{id},
-        }))!;
-        await entriesRepository.remove(entries);
-
-        await redisClient.del("entries");
-
-        return res.status(200).json({message:"Entries Deleted Successfully"})
-    }catch(error){
-        logger.error("Failed to delete entry",{error});
-         return res.status(500).json({message:"Failed to delete entries"})
-    }
-}
-
-
+  }
 }

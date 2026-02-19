@@ -1,15 +1,15 @@
-import express from 'express'
-import { EntriesController } from '../controller/EntriesController'
+import { Router } from "express";
+import { EntriesController } from "../controller/EntriesController";
+import { authMiddleware } from "../middleware/AuthMiddleware";
 
-const Router=express.Router()
+const router = Router();
 
-Router.post('/',EntriesController.createEntries)
-Router.get('/',EntriesController.getEntries)
-Router.get('/:id',EntriesController.getEntriesById)
-Router.put('/:id',EntriesController.updateEntries)
-Router.delete('/:id',EntriesController.deleteEntries)
+router.use(authMiddleware);
 
+router.post("/", EntriesController.createEntries);
+router.get("/", EntriesController.getEntries);
+router.get("/:id", EntriesController.getEntryById);
+router.put("/:id", EntriesController.updateEntry);
+router.delete("/:id", EntriesController.deleteEntry);
 
-
-export default Router
-
+export default router;
