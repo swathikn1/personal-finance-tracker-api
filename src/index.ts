@@ -5,6 +5,7 @@ import SummariesRoute from "./routes/SummariesRoute";
 import ExportRoute from "./routes/ExportRoute";
 import { connectRedis } from "./config/redis";
 import AuthRoute from "./routes/AuthRoute";
+import { DailySummaryCron } from "./cron/DailySummaryCron";
 import logger from "../src/utils/logger";
 import dotenv from "dotenv";
 
@@ -17,6 +18,7 @@ const startServer = async () => {
   try {
     await connectRedis();
     await AppDataSource.initialize();
+    await DailySummaryCron();
     console.log("Database connected");
 
     app.use('/api/v1/entries', EntriesRoute);
