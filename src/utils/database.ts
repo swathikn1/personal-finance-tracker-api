@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 import dotenv from "dotenv";
 import { Entries } from "../entity/Entries";
 import { User } from "../entity/User";
+import { DailySummary } from "../entity/DailySummary";
 
 dotenv.config();
 
@@ -16,5 +17,5 @@ export const AppDataSource = new DataSource({
   env.DB_DATABASE,
   synchronize: true, 
   logging: false,
-  entities: [Entries,User],
+  entities: [Entries,User,DailySummary],
 });

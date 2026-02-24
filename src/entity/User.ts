@@ -17,4 +17,8 @@ export class User {
 
   @OneToMany(() => Entries, (entries) => entries.user)
   entries!: Entries[];
+
+  @Column({ nullable: true })
+  refreshToken!: string;
+  
 }
