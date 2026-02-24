@@ -2,7 +2,12 @@ import type { Request,Response } from "express";
 import { AppDataSource } from "../utils/database";
 import { User } from "../entity/User";
 import bcrypt from "bcryptjs"
-import jwt from "jsonwebtoken"
+import jwt, { SignOptions } from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET as string;
+const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN as string;
+const REFRESH_EXPIRES_IN = process.env.REFRESH_EXPIRES_IN as string;
 
 
 export class AuthContoller{
@@ -46,8 +51,8 @@ export class AuthContoller{
                 if(!isPasswordValid){
                     res.status(400).json({message:"Invalid email or password"})
                 }else{
-                    const accessToken=jwt.sign({userId:user.id},process.env.JWT_SECRET||"secretKey",{expiresIn:"2h"})
-                    const refreshToken=jwt.sign({userId:user.id},process.env.REFRESH_SECRET||"refreshSecretKey",{expiresIn:"7d"})
+                    const accessToken=jwt.sign({userId:user.id},JWT_SECRET,{expiresIn:JWT_EXPIRES_IN} as SignOptions)
+                    const refreshToken=jwt.sign({userId:user.id},REFRESH_SECRET,{expiresIn:REFRESH_EXPIRES_IN} as SignOptions)
 
                     user.refreshToken=refreshToken;
                     await userRepository.save(user);
@@ -78,8 +83,7 @@ export class AuthContoller{
                 return res.status(403).json({message:"Invalid refresh token"});
             }
             
-            const newAccessToken=jwt.sign({userId:user.id},process.env.JWT_SECRET!,{expiresIn:"2h"});
-                
+            const newAccessToken=jwt.sign({userId:user.id},JWT_SECRET,{expiresIn:JWT_EXPIRES_IN} as SignOptions)
                 return res.json({accessToken:newAccessToken});
             }catch(error){
                 return res.status(403).json({message:"Invalid or expired refresh token"});
